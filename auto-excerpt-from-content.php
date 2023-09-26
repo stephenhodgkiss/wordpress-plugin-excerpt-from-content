@@ -11,7 +11,7 @@ License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
 /**
  * Automatically generate excerpts for draft posts from the content.
- * Extracts 20 words from the post content and appends a "Read more" link.
+ * Extracts 30 words from the post content and appends a "Read more" link.
  * Runs only once, when the plugin is activated and then deactivates itself.
  * 
  * Installation:
@@ -27,9 +27,12 @@ function auto_generate_excerpt_for_drafts()
     // is the plugin active?
     if (is_plugin_active(plugin_basename(__FILE__))) {
 
+        // set $args that contains draft posts with the category tag_ID=135
         $args = array(
+            'numberposts' => 100, // adjust as necessary due to possible timeouts
+            'category' => 135,
             'post_status' => 'draft',
-            'posts_per_page' => -1, // Retrieve all draft posts.
+            'offset' => 0
         );
 
         $draft_posts = get_posts($args);
@@ -37,11 +40,23 @@ function auto_generate_excerpt_for_drafts()
         $posts_updated = 0;
 
         foreach ($draft_posts as $post) {
+            $post_id = $post->ID;
             $content = $post->post_content;
             $content = strip_tags($content); // Remove HTML tags.
-            $excerpt = wp_trim_words($content, 20); // Adjust the word count as needed.
-            // Get the post permalink.
-            $permalink = get_permalink($post->ID);
+            $excerpt = wp_trim_words($content, 30); // Adjust the word count as needed.
+
+            $post_title = get_the_title($post_id);
+
+            // get the slug or if does not exist yet, Generate a slug.
+            $post_slug = $post->post_name;
+            if (!$post_slug) {
+                $post_slug = sanitize_title($post_title);
+            }
+
+            // get the protocol and domain name of the site
+            $site_url = get_site_url();
+            // combine the site url, the slug to create the full url
+            $permalink = $site_url . '/' . $post_slug;
 
             // Create the "Read more" link.
             $read_more_link = '<a href="' . esc_url($permalink) . '">Read more</a>';
@@ -52,12 +67,13 @@ function auto_generate_excerpt_for_drafts()
             // Update the post's excerpt.
             $post->post_excerpt = $excerpt_with_link;
             wp_update_post($post);
+            echo '<div class="updated"><p>' . esc_html($excerpt_with_link) . '</p></div>';
 
             $posts_updated++;
         }
 
         // Optionally, you can add a message to confirm the update
-        $message = $posts_updated . ' draft posts updated. The plugin has now deactivated itself.';
+        $message = $posts_updated . ' posts updated. The plugin has now deactivated itself.';
         echo '<div class="updated"><p>' . esc_html($message) . '</p></div>';
 
         // Deactivate the plugin.
